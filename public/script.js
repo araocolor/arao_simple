@@ -1,4 +1,17 @@
-// Landing page
+// ─── JWT 헬퍼 ──────────────────────────────────────────────────────────────────
+function getToken() {
+  return localStorage.getItem('admin_token');
+}
+
+function authHeaders() {
+  const token = getToken();
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  };
+}
+
+// ─── Landing page ──────────────────────────────────────────────────────────────
 async function loadLanding() {
   try {
     const res = await fetch('/api/sections');
@@ -22,20 +35,22 @@ async function loadLanding() {
   }
 }
 
-// Admin
+// ─── Admin ─────────────────────────────────────────────────────────────────────
 async function initAdmin() {
   const loginPage = document.getElementById('login-page');
   const adminPage = document.getElementById('admin-page');
 
-  // Check if already logged in
-  const authRes = await fetch('/api/auth-check');
+  // 이미 로그인 상태인지 확인
+  const authRes = await fetch('/api/auth-check', {
+    headers: { 'Authorization': `Bearer ${getToken()}` }
+  });
   const auth = await authRes.json();
 
   if (auth.loggedIn) {
     showAdminPanel();
   }
 
-  // Login form
+  // 로그인 폼
   document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const username = document.getElementById('username').value;
@@ -49,6 +64,8 @@ async function initAdmin() {
     });
 
     if (res.ok) {
+      const data = await res.json();
+      localStorage.setItem('admin_token', data.token);
       errorEl.style.display = 'none';
       showAdminPanel();
     } else {
@@ -57,9 +74,10 @@ async function initAdmin() {
     }
   });
 
-  // Logout
+  // 로그아웃
   document.getElementById('logout-btn').addEventListener('click', async () => {
     await fetch('/api/logout', { method: 'POST' });
+    localStorage.removeItem('admin_token');
     loginPage.style.display = 'flex';
     adminPage.style.display = 'none';
     document.getElementById('login-form').reset();
@@ -97,7 +115,7 @@ async function initAdmin() {
 
         const res = await fetch(`/api/sections/${id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders(),
           body: JSON.stringify({
             title: titleInput.value,
             content: contentInput.value

@@ -1,67 +1,113 @@
 require('dotenv').config();
 const express = require('express');
-const session = require('express-session');
 const path = require('path');
+const jwt = require('jsonwebtoken');
+const admin = require('firebase-admin');
+
+// ─── Firebase Admin 초기화 ────────────────────────────────────────────────────
+admin.initializeApp({
+  credential: admin.credential.cert({
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    // Vercel 환경변수에서 \n이 리터럴로 저장되므로 실제 줄바꿈으로 변환
+    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+  }),
+});
+const db = admin.firestore();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// In-memory sections data
-let sections = [
-  { id: 1, title: 'Welcome', content: 'This is the main section. Edit this content from the admin panel.' },
-  { id: 2, title: 'About', content: 'Tell your story here. Update this section with your information.' },
-  { id: 3, title: 'Contact', content: 'Get in touch with us. Add your contact details here.' }
-];
+const JWT_SECRET = process.env.JWT_SECRET;
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'fallback-secret',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { secure: false }
-}));
 
+// ─── JWT 인증 미들웨어 ────────────────────────────────────────────────────────
 function requireAuth(req, res, next) {
-  if (req.session && req.session.loggedIn) return next();
-  res.status(401).json({ error: 'Unauthorized' });
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    req.user = jwt.verify(authHeader.slice(7), JWT_SECRET);
+    next();
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
 }
 
-// Auth
+// ─── Auth ─────────────────────────────────────────────────────────────────────
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
-  if (username === process.env.ADMIN_USERNAME && password === process.env.ADMIN_PASSWORD) {
-    req.session.loggedIn = true;
-    res.json({ success: true });
+  if (
+    username === process.env.ADMIN_USERNAME &&
+    password === process.env.ADMIN_PASSWORD
+  ) {
+    const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: '24h' });
+    res.json({ success: true, token });
   } else {
     res.status(401).json({ error: 'Invalid credentials' });
   }
 });
 
-app.post('/api/logout', (req, res) => {
-  req.session.destroy();
+app.post('/api/logout', (_req, res) => {
   res.json({ success: true });
 });
 
 app.get('/api/auth-check', (req, res) => {
-  res.json({ loggedIn: !!(req.session && req.session.loggedIn) });
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.json({ loggedIn: false });
+  }
+  try {
+    jwt.verify(authHeader.slice(7), JWT_SECRET);
+    res.json({ loggedIn: true });
+  } catch {
+    res.json({ loggedIn: false });
+  }
 });
 
-// Sections
-app.get('/api/sections', (req, res) => {
-  res.json(sections);
+// ─── Sections ─────────────────────────────────────────────────────────────────
+app.get('/api/sections', async (_req, res) => {
+  try {
+    const snapshot = await db.collection('sections').orderBy('id').get();
+    const sections = snapshot.docs.map(doc => doc.data());
+    res.json(sections);
+  } catch (err) {
+    console.error('GET /api/sections error:', err);
+    res.status(500).json({ error: 'Failed to fetch sections' });
+  }
 });
 
-app.put('/api/sections/:id', requireAuth, (req, res) => {
+app.put('/api/sections/:id', requireAuth, async (req, res) => {
   const id = parseInt(req.params.id);
   const { title, content } = req.body;
-  const section = sections.find(s => s.id === id);
-  if (!section) return res.status(404).json({ error: 'Section not found' });
-  if (title !== undefined) section.title = title;
-  if (content !== undefined) section.content = content;
-  res.json(section);
+  try {
+    const snapshot = await db
+      .collection('sections')
+      .where('id', '==', id)
+      .limit(1)
+      .get();
+    if (snapshot.empty) {
+      return res.status(404).json({ error: 'Section not found' });
+    }
+    const updates = {};
+    if (title !== undefined) updates.title = title;
+    if (content !== undefined) updates.content = content;
+    await snapshot.docs[0].ref.update(updates);
+    const updated = (await snapshot.docs[0].ref.get()).data();
+    res.json(updated);
+  } catch (err) {
+    console.error('PUT /api/sections/:id error:', err);
+    res.status(500).json({ error: 'Failed to update section' });
+  }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-});
+// ─── 로컬 개발용 ──────────────────────────────────────────────────────────────
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server running at http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
