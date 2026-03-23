@@ -17,11 +17,17 @@ async function loadLanding() {
     const res = await fetch('/api/sections');
     const sections = await res.json();
 
+    // 히어로 스켈레톤 → 실제 콘텐츠로 교체
+    const heroSection = document.getElementById('hero-section');
     if (sections.length > 0) {
-      document.getElementById('hero-title').textContent = sections[0].title;
-      document.getElementById('hero-content').textContent = sections[0].content;
+      heroSection.classList.remove('skeleton-hero');
+      heroSection.innerHTML = `
+        <h1 id="hero-title">${escapeHtml(sections[0].title)}</h1>
+        <p id="hero-content">${escapeHtml(sections[0].content)}</p>
+      `;
     }
 
+    // 섹션 스켈레톤 → 실제 카드로 교체
     const container = document.getElementById('sections-container');
     container.innerHTML = '';
     sections.slice(1).forEach(section => {

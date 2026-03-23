@@ -147,6 +147,28 @@ nav .nav-links a:hover {
   line-height: 1.8;
 }
 
+/* SKELETON */
+@keyframes shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+}
+
+.skeleton {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
+  background-size: 600px 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+
+.skeleton-title  { height: 64px; width: 60%; margin-bottom: 20px; border-radius: var(--radius); }
+.skeleton-text   { height: 18px; width: 80%; margin-bottom: 12px; }
+.skeleton-label  { height: 12px; width: 30%; margin-bottom: 16px; }
+.skeleton-body   { height: 15px; width: 90%; margin-bottom: 10px; }
+.skeleton.short  { width: 55%; }
+
+.skeleton-hero   { pointer-events: none; }
+.skeleton-card   { pointer-events: none; }
+
 /* FOOTER */
 footer {
   padding: 28px 48px;
