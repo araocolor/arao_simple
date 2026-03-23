@@ -17,17 +17,14 @@ async function loadLanding() {
     const res = await fetch('/api/sections');
     const sections = await res.json();
 
-    // 히어로 스켈레톤 → 실제 콘텐츠로 교체
     const heroSection = document.getElementById('hero-section');
     if (sections.length > 0) {
-      heroSection.classList.remove('skeleton-hero');
       heroSection.innerHTML = `
-        <h1 id="hero-title">${escapeHtml(sections[0].title)}</h1>
-        <p id="hero-content">${escapeHtml(sections[0].content)}</p>
+        <h1>${escapeHtml(sections[0].title)}</h1>
+        <p>${escapeHtml(sections[0].content)}</p>
       `;
     }
 
-    // 섹션 스켈레톤 → 실제 카드로 교체
     const container = document.getElementById('sections-container');
     container.innerHTML = '';
     sections.slice(1).forEach(section => {
@@ -36,6 +33,16 @@ async function loadLanding() {
       card.innerHTML = `<h2>${escapeHtml(section.title)}</h2><p>${escapeHtml(section.content)}</p>`;
       container.appendChild(card);
     });
+
+    // 로딩 완료 — 오버레이 숨기고 콘텐츠 표시
+    const overlay = document.getElementById('loading-overlay');
+    overlay.classList.add('hide');
+    setTimeout(() => {
+      overlay.style.display = 'none';
+      heroSection.style.display = '';
+      container.style.display = '';
+    }, 400);
+
   } catch (err) {
     console.error('Failed to load sections', err);
   }
