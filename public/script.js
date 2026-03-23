@@ -41,7 +41,7 @@ async function loadLanding() {
       overlay.style.display = 'none';
       heroSection.style.display = '';
       container.style.display = '';
-    }, 400);
+    }, 200);
 
   } catch (err) {
     console.error('Failed to load sections', err);

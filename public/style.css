@@ -156,7 +156,7 @@ nav .nav-links a:hover {
   justify-content: center;
   background: var(--bg);
   z-index: 999;
-  transition: opacity 0.4s ease;
+  transition: opacity 0.2s ease;
 }
 
 #loading-overlay.hide {
@@ -182,7 +182,7 @@ nav .nav-links a:hover {
   width: 0%;
   background: var(--primary);
   border-radius: 2px;
-  animation: fill 0.8s ease-out forwards;
+  animation: fill 0.5s ease-out forwards;
 }
 
 /* FOOTER */
