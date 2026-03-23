@@ -1,7 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
-const jwt = require('jsonwebtoken');
 const admin = require('firebase-admin');
 
 // ─── Firebase Admin 초기화 ────────────────────────────────────────────────────
@@ -17,19 +16,18 @@ const db = admin.firestore();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET;
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ─── JWT 인증 미들웨어 ────────────────────────────────────────────────────────
-function requireAuth(req, res, next) {
+// ─── Firebase Auth 인증 미들웨어 ──────────────────────────────────────────────
+async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   try {
-    req.user = jwt.verify(authHeader.slice(7), JWT_SECRET);
+    req.user = await admin.auth().verifyIdToken(authHeader.slice(7));
     next();
   } catch {
     return res.status(401).json({ error: 'Invalid or expired token' });
@@ -37,34 +35,8 @@ function requireAuth(req, res, next) {
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
-app.post('/api/login', (req, res) => {
-  const { username, password } = req.body;
-  if (
-    username === process.env.ADMIN_USERNAME &&
-    password === process.env.ADMIN_PASSWORD
-  ) {
-    const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: '24h' });
-    res.json({ success: true, token });
-  } else {
-    res.status(401).json({ error: 'Invalid credentials' });
-  }
-});
-
 app.post('/api/logout', (_req, res) => {
   res.json({ success: true });
-});
-
-app.get('/api/auth-check', (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.json({ loggedIn: false });
-  }
-  try {
-    jwt.verify(authHeader.slice(7), JWT_SECRET);
-    res.json({ loggedIn: true });
-  } catch {
-    res.json({ loggedIn: false });
-  }
 });
 
 // ─── Sections ─────────────────────────────────────────────────────────────────

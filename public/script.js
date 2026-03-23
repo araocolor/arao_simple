@@ -1,14 +1,9 @@
-// ─── JWT 헬퍼 ──────────────────────────────────────────────────────────────────
-function getToken() {
-  return localStorage.getItem('admin_token');
-}
-
-function authHeaders() {
-  const token = getToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-  };
+// ─── Firebase Auth 헬퍼 ────────────────────────────────────────────────────────
+async function authHeaders() {
+  const user = firebase.auth().currentUser;
+  if (!user) return { 'Content-Type': 'application/json' };
+  const token = await user.getIdToken();
+  return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
 }
 
 // ─── Landing page ──────────────────────────────────────────────────────────────
@@ -53,46 +48,35 @@ async function initAdmin() {
   const loginPage = document.getElementById('login-page');
   const adminPage = document.getElementById('admin-page');
 
-  // 이미 로그인 상태인지 확인
-  const authRes = await fetch('/api/auth-check', {
-    headers: { 'Authorization': `Bearer ${getToken()}` }
+  // Firebase Auth 상태 감지 — 이미 로그인된 경우 자동으로 패널 표시
+  firebase.auth().onAuthStateChanged(user => {
+    if (user) {
+      showAdminPanel();
+    } else {
+      loginPage.style.display = 'flex';
+      adminPage.style.display = 'none';
+    }
   });
-  const auth = await authRes.json();
-
-  if (auth.loggedIn) {
-    showAdminPanel();
-  }
 
   // 로그인 폼
   document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const username = document.getElementById('username').value;
+    const email = document.getElementById('username').value;
     const password = document.getElementById('password').value;
     const errorEl = document.getElementById('login-error');
 
-    const res = await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      localStorage.setItem('admin_token', data.token);
+    try {
+      await firebase.auth().signInWithEmailAndPassword(email, password);
       errorEl.style.display = 'none';
-      showAdminPanel();
-    } else {
-      errorEl.textContent = 'Invalid username or password';
+    } catch (err) {
+      errorEl.textContent = 'Invalid email or password';
       errorEl.style.display = 'block';
     }
   });
 
   // 로그아웃
   document.getElementById('logout-btn').addEventListener('click', async () => {
-    await fetch('/api/logout', { method: 'POST' });
-    localStorage.removeItem('admin_token');
-    loginPage.style.display = 'flex';
-    adminPage.style.display = 'none';
+    await firebase.auth().signOut();
     document.getElementById('login-form').reset();
   });
 
@@ -128,7 +112,7 @@ async function initAdmin() {
 
         const res = await fetch(`/api/sections/${id}`, {
           method: 'PUT',
-          headers: authHeaders(),
+          headers: await authHeaders(),
           body: JSON.stringify({
             title: titleInput.value,
             content: contentInput.value
